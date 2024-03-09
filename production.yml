@@ -1,0 +1,61 @@
+
+version: '3'
+
+
+services:
+  jupyter:
+    image: jupyter/datascience-notebook:latest
+    container_name: jupyter
+    ports:
+      - 8888:8888
+    environment:
+      JUPYTER_ENABLE_LAB: "yes"
+      JUPYTER_TOKEN: "docker"
+
+  traefik:
+    build:
+      context: .
+      dockerfile: ./compose/production/traefik/Dockerfile
+    image: clio_production_traefik
+    depends_on:
+      - jupyter
+      - open-webui
+    volumes:
+      - production_traefik:/etc/traefik/acme
+    environment:
+      - DOMAIN_NAME=${DOMAIN_NAME}
+    ports:
+      - '0.0.0.0:80:80'
+      - '0.0.0.0:443:443'
+
+  open-webui:
+    network_mode: host
+    volumes:
+        - open-webui:/app/backend/data
+    environment:
+        - OLLAMA_BASE_URL=http://127.0.0.1:11434
+    container_name: open-webui
+    restart: always
+    image: ghcr.io/open-webui/open-webui:main
+  
+  ollama:
+    deploy:
+        resources:
+            reservations:
+                devices:
+                    - driver: nvidia
+                      count: all
+                      capabilities:
+                          - gpu
+    volumes:
+        - ollama:/root/.ollama
+    ports:
+        - 11434:11434
+    container_name: ollama
+    image: ollama/ollama
+volumes:
+    open-webui:
+        name: open-webui
+    ollama:
+        name: ollama
+    production_traefik: {}
